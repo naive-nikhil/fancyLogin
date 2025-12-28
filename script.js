@@ -1,20 +1,28 @@
-const eyesGroup = document.querySelector("#eyes");
-const bodyPath = document.querySelector("#body");
-const pupils = [
-  { eye: document.querySelector(".eye1"), pupil: document.querySelector(".pupil1") },
-  { eye: document.querySelector(".eye2"), pupil: document.querySelector(".pupil2") }
+// --- 1. Selectors ---
+const char1Body = document.querySelector("#body1");
+const char1Eyes = document.querySelector("#eyes1");
+
+const char2Body = document.querySelector("#body2");
+const char2Eyes = document.querySelector("#eyes2");
+const char2Mouth = document.querySelector("#mouth");
+
+// Track Pupils for Character 1 ONLY
+const pupilsTracker = [
+  { eye: document.querySelector("#character_one .eye1"), pupil: document.querySelector("#character_one .pupil1") },
+  { eye: document.querySelector("#character_one .eye2"), pupil: document.querySelector("#character_one .pupil2") }
 ];
 
-const state = { bend: 0, headRotate: 0 }; 
+// --- State Management (Added mouseY) ---
+const state = { 
+  mouseX: 0, 
+  mouseY: 0 
+};
 
-// --- 1. Blinking Logic ---
+// --- 2. Blinking Logic ---
 function blink() {
-  const blinkDuration = 0.1; // speed of closing/opening
-
-  // Create a timeline for the blink so it goes Close -> Open
+  const blinkDuration = 0.1;
   const tl = gsap.timeline({
     onComplete: () => {
-      // Schedule the next blink randomly between 2 to 6 seconds
       const nextBlinkTime = Math.random() * 4000 + 2000;
       setTimeout(blink, nextBlinkTime);
     }
@@ -34,32 +42,65 @@ function blink() {
     repeat: 1
   }, 0);
 }
-
-// Start the blinking loop
-setTimeout(blink, 3000);
+setTimeout(blink, 2000);
 
 
-// --- 2. Render Loop (Body & Head Movement) ---
+// --- 3. Render Loop ---
 function render() {
-  const { bend, headRotate } = state;
-  const w = 80, h = 200;
+  const { mouseX, mouseY } = state;
 
-  // Draw Body (Banana Curve)
-  const path = `
-    M 0 ${h}
-    Q 0 ${h / 2} ${bend} 0
-    L ${w + bend} 0
-    Q ${w} ${h / 2} ${w} ${h}
+  // === Character 1 Math (Left/Right only) ===
+  const bend1 = mouseX / 40; 
+  const rotate1 = mouseX / 60;
+  const w1 = 80, h1 = 200;
+  const path1 = `
+    M 0 ${h1}
+    Q 0 ${h1 / 2} ${bend1} 0
+    L ${w1 + bend1} 0
+    Q ${w1} ${h1 / 2} ${w1} ${h1}
     Z
   `;
-  bodyPath.setAttribute("d", path);
+  char1Body.setAttribute("d", path1);
+  char1Eyes.style.transform = `translate(${bend1 + rotate1}px, 0)`;
 
-  // Move Eyes Group (Body bend + Head rotation)
-  eyesGroup.style.transform = `translate(${bend + headRotate}px, 0)`;
+
+  // === Character 2 Math (Full XY Movement) ===
+  // 1. Calculate Body Bend (Left/Right)
+  const bend2 = mouseX / 25; 
+  
+  // 2. Calculate Face Movement (X and Y)
+  const faceMoveX = bend2 * 1.6; // Moves horizontally with body
+  const faceMoveY = mouseY / 40; // Moves vertically based on mouse height
+  
+  // Apply Transform to Eyes and Mouth
+  // We combine X and Y into one translate string
+  const faceTransform = `translate(${faceMoveX}px, ${faceMoveY}px)`;
+  char2Eyes.style.transform = faceTransform;
+  char2Mouth.style.transform = faceTransform;
+
+  // 3. Body Path Construction (Same Cubic Bezier Logic)
+  const baseWidth2 = 200;
+  const baseHeight2 = 200;
+  const radius2 = baseWidth2 / 2; 
+  const peakY2 = baseHeight2 - radius2;
+  const midX2 = (baseWidth2 / 2) + bend2;
+  const cpOffset2 = radius2 * 0.55228;
+
+  const path2 = `
+    M 0 ${baseHeight2}
+    C 0 ${baseHeight2 - cpOffset2}
+      ${midX2 - cpOffset2} ${peakY2}
+      ${midX2} ${peakY2}
+    C ${midX2 + cpOffset2} ${peakY2}
+      ${baseWidth2} ${baseHeight2 - cpOffset2}
+      ${baseWidth2} ${baseHeight2}
+    Z
+  `;
+  char2Body.setAttribute("d", path2);
 }
 
 
-// --- 3. Pupil Movement ---
+// --- 4. Pupil Tracking (Char 1) ---
 function updatePupil({ eye, pupil }, e) {
   const rect = eye.getBoundingClientRect();
   const cx = rect.left + rect.width / 2;
@@ -67,21 +108,27 @@ function updatePupil({ eye, pupil }, e) {
   const dx = e.clientX - cx;
   const dy = e.clientY - cy;
   const dist = Math.sqrt(dx * dx + dy * dy);
-  const max = 3; 
+  
+  const maxMoveRadius = 3; 
   if (dist === 0) return;
-  const move = Math.min(dist, max);
-  pupil.style.transform = `translate(${(dx / dist) * move}px, ${(dy / dist) * move}px)`;
+  const moveAmount = Math.min(dist, maxMoveRadius);
+  
+  pupil.style.transform = `translate(${(dx / dist) * moveAmount}px, ${(dy / dist) * moveAmount}px)`;
 }
 
+// --- 5. Mouse Event Listener ---
 document.addEventListener("mousemove", (e) => {
-  pupils.forEach(p => updatePupil(p, e));
+  // Update Char 1 pupils
+  pupilsTracker.forEach(p => updatePupil(p, e));
 
-  const mouseX = e.clientX - window.innerWidth / 2;
+  // Get Mouse X and Y relative to window center
+  const currentMouseX = e.clientX - window.innerWidth / 2;
+  const currentMouseY = e.clientY - window.innerHeight / 2;
 
   gsap.to(state, {
     duration: 0.6,
-    bend: mouseX / 40,      // Main spine curve
-    headRotate: mouseX / 60, // Extra face turn
+    mouseX: currentMouseX,
+    mouseY: currentMouseY, // Store Y position
     ease: "power2.out",
     overwrite: "auto",
     onUpdate: render

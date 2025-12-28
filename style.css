@@ -61,4 +61,8 @@ svg {
   }
 }
 
+#character_two {
+  transform: translateX(-100px);
+}
+
 
